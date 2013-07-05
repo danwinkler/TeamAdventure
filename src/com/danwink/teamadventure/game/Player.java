@@ -9,6 +9,7 @@ public class Player extends Unit
 	public Player()
 	{
 		super();
+		inventory[0] = new MiniWand();
 	}
 	
 	public void render( Graphics g )

@@ -5,6 +5,8 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import javax.vecmath.Point2f;
+
 import org.mini2Dx.core.game.GameContainer;
 import org.mini2Dx.core.graphics.Graphics;
 import org.mini2Dx.core.screen.GameScreen;
@@ -29,6 +31,8 @@ public class PlayScreen implements GameScreen
 	
 	ArrayList<Unit> units = new ArrayList<Unit>();
 	HashMap<Integer, Unit> unitMap = new HashMap<Integer, Unit>();
+	
+	ArrayList<Animation> anims = new ArrayList<Animation>();
 	
 	public void initialise( GameContainer gc )
 	{
@@ -56,6 +60,14 @@ public class PlayScreen implements GameScreen
 				Unit u = units.get( i );
 				u.render( g );
 			}
+			
+			for( int i = 0; i < anims.size(); i++ )
+			{
+				anims.get( i ).render( g );
+			}
+			
+			g.setColor( Color.RED );
+			g.drawCircle( Gdx.input.getX() + (int)(player.pos.x*Map.tileSize - gc.getWidth()/2), Gdx.input.getY() + (int)(player.pos.y*Map.tileSize - gc.getHeight()/2), 10 );
 		}
 	}
 
@@ -108,6 +120,12 @@ public class PlayScreen implements GameScreen
 						u.pos.y = uu.y;
 						break;
 					}
+					case PLAYANIM:
+					{
+						Animation a = (Animation)packet.message;
+						anims.add( a );
+						break;
+					}
 				}
 			}
 		}
@@ -132,6 +150,17 @@ public class PlayScreen implements GameScreen
 							break searchForNullTiles;
 						}
 					}
+				}
+			}
+		
+			for( int i = 0; i < anims.size(); i++ )
+			{
+				Animation a = anims.get( i );
+				a.update( d );
+				if( !a.alive )
+				{
+					anims.remove( a );
+					i--;
 				}
 			}
 			
@@ -165,8 +194,9 @@ public class PlayScreen implements GameScreen
 			
 			if( Gdx.input.isButtonPressed( Input.Buttons.LEFT ) )
 			{
-				client.sendToServer( new TAPacket( TAPacketType.CLICK, new int[] { Input.Buttons.LEFT, Gdx.input.getX() - (int)(player.pos.x*Map.tileSize - gc.getWidth()/2), 
-																									Gdx.input.getY() - (int)(player.pos.y*Map.tileSize - gc.getHeight()/2) } ) );
+				Point2f mouseInWorld = screenToPos( Gdx.input.getX(), Gdx.input.getY(), gc );
+				client.sendToServer( new TAPacket( TAPacketType.CLICK, new float[] { Input.Buttons.LEFT, mouseInWorld.x, mouseInWorld.y } ) );
+				
 			}
 		}
 	}
@@ -174,5 +204,19 @@ public class PlayScreen implements GameScreen
 	public int getId()
 	{
 		return this.getClass().getName().hashCode();
+	}
+	
+	public Point2f screenToPos( float x, float y, GameContainer gc )
+	{
+		Point2f p = new Point2f( x, y );
+		p.x += player.pos.x*Map.tileSize;
+		p.y += player.pos.y*Map.tileSize;
+		
+		p.x -= gc.getWidth()/2;
+		p.y -= gc.getHeight()/2;
+		
+		p.x /= Map.tileSize;
+		p.y /= Map.tileSize;
+		return p;
 	}
 }

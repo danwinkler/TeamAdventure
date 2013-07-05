@@ -6,5 +6,6 @@ public enum TAPacketType
 	TILEUPDATE,
 	PLAYERINFO,
 	UNITUPDATE, 
-	CLICK;
+	CLICK, 
+	PLAYANIM;
 }

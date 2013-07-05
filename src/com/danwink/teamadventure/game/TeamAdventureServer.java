@@ -1,16 +1,11 @@
-package com.danwink.teamadventure;
+package com.danwink.teamadventure.game;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import com.danwink.teamadventure.game.ClassRegisterHelper;
-import com.danwink.teamadventure.game.Map;
-import com.danwink.teamadventure.game.MapGenerator;
-import com.danwink.teamadventure.game.Player;
-import com.danwink.teamadventure.game.TAPacket;
-import com.danwink.teamadventure.game.TAPacketType;
-import com.danwink.teamadventure.game.Unit;
-import com.danwink.teamadventure.game.UnitUpdate;
+import javax.vecmath.Point2f;
+
+import com.badlogic.gdx.Input;
 import com.phyloa.dlib.network.DMessage;
 import com.phyloa.dlib.network.DServer;
 
@@ -21,6 +16,9 @@ public class TeamAdventureServer
 	Map map;
 	ArrayList<Unit> units = new ArrayList<Unit>();
 	HashMap<Integer, Unit> unitMap = new HashMap<Integer, Unit>();
+	HashMap<Integer, Player> players = new HashMap<Integer, Player>();
+	
+	ArrayList<Particle> particles = new ArrayList<Particle>();
 	
 	public void begin()
 	{
@@ -34,8 +32,19 @@ public class TeamAdventureServer
 		t.start();
 	}
 	
-	public void update()
+	public void update( float d )
 	{
+		for( int i = 0; i < particles.size(); i++ )
+		{
+			Particle p = particles.get( i );
+			p.update( this, d );
+			if( !p.alive )
+			{
+				particles.remove( i );
+				i--;
+			}
+		}
+		
 		while( server.hasServerMessages() )
 		{
 			DMessage<TAPacket> m = server.getNextServerMessage();
@@ -44,7 +53,7 @@ public class TeamAdventureServer
 			{
 				case CONNECTED: 
 				{
-					//Send basic map outline
+					//Send map info
 					server.sendToClient( m.sender, new TAPacket( TAPacketType.MAPINFO, map.getInfo() ) );
 					
 					//create a player, add it to unit list/map, send it
@@ -54,6 +63,8 @@ public class TeamAdventureServer
 					
 					units.add( p );
 					unitMap.put( p.id, p );
+					
+					players.put( m.sender, p );
 					
 					server.sendToClient( m.sender, new TAPacket( TAPacketType.PLAYERINFO, p ) );
 					break;
@@ -83,12 +94,32 @@ public class TeamAdventureServer
 							server.sendToAllClients( new TAPacket( TAPacketType.UNITUPDATE, uu ) );
 							break;
 						}
+						case CLICK:
+						{
+							float[] vals = (float[])p.message;
+							int selectedItem = 0; //@TODO  Have client send selected item
+							if( vals[0] == Input.Buttons.LEFT )
+							{
+								Player player = players.get( m.sender );
+								Item item = player.inventory[selectedItem];
+								if( item != null )
+								{
+									item.use( player, this, new Point2f( vals[1], vals[2] ) );
+								}
+							}
+							break;
+						}
 					}
 					
 					break;
 				}
 			}
 		}
+	}
+	
+	public void playAnimation( Animation animation ) 
+	{
+		server.sendToAllClients( new TAPacket( TAPacketType.PLAYANIM, animation ) );
 	}
 	
 	public class ServerLoop implements Runnable 
@@ -105,10 +136,13 @@ public class TeamAdventureServer
 		public void run() 
 		{
 			lastTime = System.currentTimeMillis();
+			long lastWholeFrame = lastTime;
 			while( running )
 			{
 				try{
-				update();
+				long timeDiff = System.currentTimeMillis() - lastWholeFrame;
+				lastWholeFrame = System.currentTimeMillis();
+				update( 1000.f / timeDiff );
 				} catch( Exception ex )
 				{
 					ex.printStackTrace();
@@ -134,5 +168,10 @@ public class TeamAdventureServer
 	{
 		TeamAdventureServer tas = new TeamAdventureServer();
 		tas.begin();
+	}
+
+	public void addParticle( Particle particle )
+	{
+		particles.add( particle );
 	}
 }
